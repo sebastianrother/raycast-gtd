@@ -4,11 +4,11 @@ import { showToast, Toast } from "@raycast/api";
 import { setTimeout } from "timers/promises";
 import { getPreferenceValues } from "@raycast/api";
 import { PRIORITY, CATEGORY, TCategoryKey, getAllUncheckedTodos, Todo } from "./todo";
+import { getRelativeDate } from "./date";
 
 // TODO: Add delegated work via @[[User]] syntax
 // TODO: Allow custom priority levels
 // TODO: Allow customed categories
-// TODO: Allow due dates
 // TODO: Allow opening tasks in context
 // TODO: Allow editing tasks
 // TODO: Allow showing tasks with full details
@@ -52,25 +52,32 @@ export default function Command() {
     setTodos(todos.filter((todo) => !todo.is_completed));
   };
 
-  const completeTask = (taskId: Todo["id"]) => {
+  const getTodoById = (taskId: Todo["id"]) => {
     const todo = todos.find((task) => task.id === taskId);
     if (!todo) {
       console.error("Task not found", taskId);
-      return;
+      throw new Error("Task not found");
     }
+    return todo;
+  };
+
+  const completeTask = (taskId: Todo["id"]) => {
+    const todo = getTodoById(taskId);
     todo.complete();
     rerender();
     notifyCompletion(todo);
   };
 
   const changePriority = (taskId: Todo["id"], priority: keyof typeof PRIORITY) => {
-    const todo = todos.find((task) => task.id === taskId);
-    if (!todo) {
-      console.error("Task not found", taskId);
-      return;
-    }
+    const todo = getTodoById(taskId);
+    todo.setPriority(priority);
+    todo.commit();
+    rerender();
+  };
 
-    todo.changePriority(priority);
+  const changeDueDate = (taskId: Todo["id"], dueDate: Date | null) => {
+    const todo = getTodoById(taskId);
+    todo.setDueDate(dueDate || undefined);
     todo.commit();
     rerender();
   };
@@ -113,17 +120,30 @@ export default function Command() {
         return (
           <List.Section title={PRIORITY[priority].name} key={priority}>
             {tasks.map((task) => {
+              type TTags = NonNullable<Parameters<typeof List.Item>[0]["accessories"]>;
+              const tags: TTags = [
+                { tag: { value: task.priority, color: PRIORITY[task.priority].color } },
+                {
+                  tag: { value: CATEGORY[task.category].icon, color: Color.Blue },
+                  tooltip: CATEGORY[task.category].name,
+                },
+              ];
+
+              if (task.due_date) {
+                tags.push({
+                  tag: {
+                    value: getRelativeDate(task.due_date),
+                    color: task.is_overdue ? Color.Red : Color.SecondaryText,
+                  },
+                  tooltip: task.due_date.toISOString().split("T")[0],
+                });
+              }
+
               return (
                 <List.Item
                   title={task.content}
                   icon={task.is_pending_completion ? Icon.Check : Icon.Circle}
-                  accessories={[
-                    { tag: { value: task.priority, color: PRIORITY[task.priority].color } },
-                    {
-                      tag: { value: CATEGORY[task.category].icon, color: Color.Blue },
-                      tooltip: CATEGORY[task.category].name,
-                    },
-                  ]}
+                  accessories={tags}
                   key={task.id}
                   actions={
                     <ActionPanel>
@@ -140,6 +160,11 @@ export default function Command() {
                             />
                           );
                         })}
+                      <Action.PickDate
+                        title="Set Due Date"
+                        type="Date"
+                        onChange={(date) => changeDueDate(task.id, date)}
+                      />
                     </ActionPanel>
                   }
                 />

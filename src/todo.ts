@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Color } from "@raycast/api";
+import { getCurrentDate } from "./date";
 
 const TODO_STATE = {
   TODO: "TODO",
@@ -17,6 +18,7 @@ export class Todo {
   raw_content: string;
   priority: keyof typeof PRIORITY;
   category: keyof typeof CATEGORY;
+  due_date?: Date;
   private state: TTodoState;
 
   constructor(path: string, line: number, content: string) {
@@ -30,10 +32,18 @@ export class Todo {
       category = ICON_TO_CATEGORY[categoryIcon as TCategoryIcon];
     }
 
+    const dueDateRegex = /-> (\d{4}-\d{2}-\d{2})/;
+    const dueDateMatch = content.match(dueDateRegex);
+    if (dueDateMatch) {
+      const [, timeStamp] = dueDateMatch;
+      this.due_date = new Date(timeStamp);
+    }
+
     const parsed_content = content
       .trim()
       .replace("- [ ]", "")
       .replace(CATEGORY[category as TCategoryKey].icon, "")
+      .replace(dueDateRegex, "")
       .replace(`{${priority}}`, "")
       .trim();
 
@@ -45,6 +55,14 @@ export class Todo {
     this.priority = priority;
     this.category = category;
     this.state = TODO_STATE.TODO;
+  }
+
+  get is_overdue() {
+    if (!this.due_date) {
+      return false;
+    }
+
+    return this.due_date < getCurrentDate();
   }
 
   get is_completed() {
@@ -62,8 +80,12 @@ export class Todo {
     this.state = TODO_STATE.TODO;
   }
 
-  changePriority(newPriority: keyof typeof PRIORITY) {
+  setPriority(newPriority: keyof typeof PRIORITY) {
     this.priority = newPriority;
+  }
+
+  setDueDate(newDueDate?: Date) {
+    this.due_date = newDueDate;
   }
 
   commit() {
@@ -79,6 +101,7 @@ export class Todo {
       CATEGORY[this.category].icon,
       this.content,
       this.priority === "NONE" ? "" : `{${this.priority}}`,
+      this.due_date ? `-> ${this.due_date.toISOString().split("T")[0]}` : "",
       this.state === TODO_STATE.COMPLETED ? `✅ ${completion_date}` : "",
     ].join(" ");
 
