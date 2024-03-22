@@ -5,6 +5,17 @@ import { setTimeout } from "timers/promises";
 import { getPreferenceValues } from "@raycast/api";
 import { PRIORITY, CATEGORY, TCategoryKey, getAllUncheckedTodos, Todo } from "./todo";
 
+// TODO: Add delegated work via @[[User]] syntax
+// TODO: Allow custom priority levels
+// TODO: Allow customed categories
+// TODO: Allow due dates
+// TODO: Allow opening tasks in context
+// TODO: Allow editing tasks
+// TODO: Allow showing tasks with full details
+// TODO: Allow sub-tasks
+// TODO: Support analytics
+// TODO: Better readme
+
 interface Preferences {
   gtd__directory: string;
 }
