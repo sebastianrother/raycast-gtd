@@ -52,6 +52,18 @@ export default function Command() {
     notifyCompletion(todo);
   };
 
+  const changePriority = (taskId: Todo["id"], priority: keyof typeof PRIORITY) => {
+    const todo = todos.find((task) => task.id === taskId);
+    if (!todo) {
+      console.error("Task not found", taskId);
+      return;
+    }
+
+    todo.changePriority(priority);
+    todo.commit();
+    rerender();
+  };
+
   const filteredTasks = todos.filter((task) => {
     return filter === "ALL" || task.category === filter;
   });
@@ -105,6 +117,18 @@ export default function Command() {
                   actions={
                     <ActionPanel>
                       <Action title="Complete Task" onAction={() => completeTask(task.id)} />
+                      {Object.keys(PRIORITY)
+                        .filter((priority) => priority !== "NONE")
+                        .map((priority, i) => {
+                          return (
+                            <Action
+                              title={`Change Priority to: "${PRIORITY[priority].name}"`}
+                              onAction={() => changePriority(task.id, priority)}
+                              shortcut={{ modifiers: ["cmd"], key: (i + 1).toString() }}
+                              key={`action-move-to-${priority}`}
+                            />
+                          );
+                        })}
                     </ActionPanel>
                   }
                 />

@@ -3,11 +3,11 @@ import path from "path";
 import { Color } from "@raycast/api";
 
 const TODO_STATE = {
-  "TODO": "TODO",
-  "PENDING_COMPLETION": "PENDING_COMPLETION",
-  "COMPLETED": "COMPLETED",
+  TODO: "TODO",
+  PENDING_COMPLETION: "PENDING_COMPLETION",
+  COMPLETED: "COMPLETED",
 } as const;
-type TTodoState = typeof TODO_STATE[keyof typeof TODO_STATE];
+type TTodoState = (typeof TODO_STATE)[keyof typeof TODO_STATE];
 
 export class Todo {
   id: string;
@@ -62,17 +62,27 @@ export class Todo {
     this.state = TODO_STATE.TODO;
   }
 
+  changePriority(newPriority: keyof typeof PRIORITY) {
+    this.priority = newPriority;
+  }
+
   commit() {
     // Commits the completion of the todo to the file
-    
-    if (this.state !== TODO_STATE.PENDING_COMPLETION) {
-      return;
+
+    if (this.state === TODO_STATE.PENDING_COMPLETION) {
+      this.state = TODO_STATE.COMPLETED;
     }
 
     const completion_date = new Date().toISOString().split("T")[0];
-    const newContent = this.raw_content.replace("- [ ]", `- [x]`) + ` ✅ ${completion_date}`;
+    const newContent = [
+      this.state === TODO_STATE.COMPLETED ? "- [x]" : "- [ ]",
+      CATEGORY[this.category].icon,
+      this.content,
+      this.priority === "NONE" ? "" : `{${this.priority}}`,
+      this.state === TODO_STATE.COMPLETED ? `✅ ${completion_date}` : "",
+    ].join(" ");
+
     replaceLine(this.path, this.line, newContent);
-    this.state = TODO_STATE.COMPLETED;
   }
 }
 
