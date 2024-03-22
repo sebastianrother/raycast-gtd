@@ -86,12 +86,12 @@ export default function Command() {
     return filter === "ALL" || task.category === filter;
   });
 
-  const tasksByPriority = ((tasks: Todo[]) => {
-    const result: Record<keyof typeof PRIORITY, Todo[]> = {};
+  const tasksByPriority = ((tasks: Todo[]): Record<keyof typeof PRIORITY, Todo[]> => {
+    const result: Record<string, Todo[]> = {};
+    result["NONE"] = [];
     for (const priority of Object.keys(PRIORITY)) {
       result[priority as keyof typeof PRIORITY] = [];
     }
-    result["NONE"] = [];
 
     for (const task of tasks) {
       result[task.priority].push(task);
@@ -106,7 +106,7 @@ export default function Command() {
         <List.Dropdown
           tooltip="Filter by category"
           onChange={(value) => {
-            setFilter(value);
+            setFilter(value as keyof typeof CATEGORY);
           }}
         >
           <List.Dropdown.Item value="ALL" title="🪐 All" />;
@@ -117,8 +117,9 @@ export default function Command() {
       }
     >
       {Object.entries(tasksByPriority).map(([priority, tasks]) => {
+        const currentPriority = PRIORITY[priority as keyof typeof tasksByPriority];
         return (
-          <List.Section title={PRIORITY[priority].name} key={priority}>
+          <List.Section title={currentPriority.name} key={priority}>
             {tasks.map((task) => {
               type TTags = NonNullable<Parameters<typeof List.Item>[0]["accessories"]>;
               const tags: TTags = [
@@ -153,8 +154,9 @@ export default function Command() {
                         .map((priority, i) => {
                           return (
                             <Action
-                              title={`Change Priority to: "${PRIORITY[priority].name}"`}
-                              onAction={() => changePriority(task.id, priority)}
+                              title={`Change Priority to: "${currentPriority.name}"`}
+                              onAction={() => changePriority(task.id, priority as keyof typeof PRIORITY)}
+                              // @ts-expect-error No idea how to cast this
                               shortcut={{ modifiers: ["cmd"], key: (i + 1).toString() }}
                               key={`action-move-to-${priority}`}
                             />
