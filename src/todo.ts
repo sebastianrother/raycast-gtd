@@ -65,6 +65,16 @@ export class Todo {
     return this.due_date < getCurrentDate();
   }
 
+  get is_due() {
+    if (!this.due_date) {
+      return false;
+    }
+
+    console.log(this.content, this.due_date, getCurrentDate(), this.due_date <= getCurrentDate());
+
+    return this.due_date <= getCurrentDate();
+  }
+
   get is_completed() {
     return this.state === TODO_STATE.COMPLETED;
   }

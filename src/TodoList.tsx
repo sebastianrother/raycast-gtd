@@ -1,35 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActionPanel, List, Action, Icon, Color } from "@raycast/api";
 import { showToast, Toast } from "@raycast/api";
 import { setTimeout } from "timers/promises";
-import { getPreferenceValues } from "@raycast/api";
-import { PRIORITY, CATEGORY, TCategoryKey, getAllUncheckedTodos, Todo } from "./todo";
+import { PRIORITY, CATEGORY, TCategoryKey, Todo } from "./todo";
 import { getRelativeDate } from "./date";
 
-// TODO: Add delegated work via @[[User]] syntax
-// TODO: Allow custom priority levels
-// TODO: Allow customed categories
-// TODO: Allow opening tasks in context
-// TODO: Allow editing tasks
-// TODO: Allow showing tasks with full details
-// TODO: Allow sub-tasks
-// TODO: Support analytics
-// TODO: Better readme
-
-interface Preferences {
-  gtd__directory: string;
-}
-
-export default function Command() {
-  const { gtd__directory } = getPreferenceValues<Preferences>();
-  const [todos, setTodos] = useState<Todo[]>([]);
+export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reloadTodos: () => void }) {
   const [filter, setFilter] = useState<TCategoryKey | "ALL">("ALL");
-  const rerenderFn = useState({})[1];
-  const rerender = () => rerenderFn({});
-
-  useEffect(() => {
-    setTodos(getAllUncheckedTodos(gtd__directory));
-  }, []);
 
   const notifyCompletion = async (completedTodo: Todo) => {
     const toast = await showToast({
@@ -40,7 +17,7 @@ export default function Command() {
         onAction: (toast) => {
           completedTodo.uncomplete();
           toast.hide();
-          rerender();
+          reloadTodos();
         },
       },
     });
@@ -49,7 +26,7 @@ export default function Command() {
 
     await toast.hide();
     completedTodo.commit();
-    setTodos(todos.filter((todo) => !todo.is_completed));
+    reloadTodos();
   };
 
   const getTodoById = (taskId: Todo["id"]) => {
@@ -64,7 +41,7 @@ export default function Command() {
   const completeTask = (taskId: Todo["id"]) => {
     const todo = getTodoById(taskId);
     todo.complete();
-    rerender();
+    reloadTodos();
     notifyCompletion(todo);
   };
 
@@ -72,14 +49,14 @@ export default function Command() {
     const todo = getTodoById(taskId);
     todo.setPriority(priority);
     todo.commit();
-    rerender();
+    reloadTodos();
   };
 
   const changeDueDate = (taskId: Todo["id"], dueDate: Date | null) => {
     const todo = getTodoById(taskId);
     todo.setDueDate(dueDate || undefined);
     todo.commit();
-    rerender();
+    reloadTodos();
   };
 
   const filteredTasks = todos.filter((task) => {

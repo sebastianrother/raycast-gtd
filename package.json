@@ -17,8 +17,14 @@
   ],
   "commands": [
     {
-      "name": "index",
-      "title": "My Todos",
+      "name": "all-todos",
+      "title": "All Todos",
+      "description": "",
+      "mode": "view"
+    },
+    {
+      "name": "today-todos",
+      "title": "Today Todos",
       "description": "",
       "mode": "view"
     }
