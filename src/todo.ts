@@ -10,6 +10,18 @@ const TODO_STATE = {
 } as const;
 type TTodoState = (typeof TODO_STATE)[keyof typeof TODO_STATE];
 
+/**
+ * Syntax
+ * "- [ ]": Uncompleted task
+ * "- [x]": Completed task
+ * "{PRIORITY}": Priority of the task. Can be one of `p1` - `p4` or `NONE`
+ * "CATEGORY EMOJI": Category of the task. Can be one of the following 💬 📚 💾 ✏️ 💡 🔭 👔 ❌
+ * "-> YYYY-MM-DD": Due date of the task
+ * "✅ YYYY-MM-DD": Completion date of the task
+ * `@{LABEL}`: Label of the task
+ * `#{LABEL}`: Project of the task
+ *
+ */
 export class Todo {
   id: string;
   path: string;
@@ -19,10 +31,12 @@ export class Todo {
   priority: keyof typeof PRIORITY;
   category: keyof typeof CATEGORY;
   due_date?: Date;
+  projects: string[] = [];
   private state: TTodoState;
 
   constructor(path: string, line: number, content: string) {
-    const priority = (content.match(/\{(.*?)\}/)?.[1] || "NONE") as keyof typeof PRIORITY;
+    const priorityRegex = /\{(.*?)\}/;
+    const priority = (content.match(priorityRegex)?.[1] || "NONE") as keyof typeof PRIORITY;
 
     let category: TCategoryKey = "NONE";
     for (const categoryIcon of Object.keys(ICON_TO_CATEGORY)) {
@@ -39,12 +53,19 @@ export class Todo {
       this.due_date = new Date(timeStamp);
     }
 
+    const projectRegex = /#(\S+)/g;
+    const projects = content.matchAll(projectRegex);
+    if (projects) {
+      this.projects = Array.from(projects).map((match) => match[1]);
+    }
+
     const parsed_content = content
       .trim()
       .replace("- [ ]", "")
       .replace(CATEGORY[category as TCategoryKey].icon, "")
       .replace(dueDateRegex, "")
-      .replace(`{${priority}}`, "")
+      .replace(priorityRegex, "")
+      .replaceAll(projectRegex, "")
       .trim();
 
     this.id = `${path}:${line}`;
@@ -112,6 +133,7 @@ export class Todo {
       this.content,
       this.priority === "NONE" ? "" : `{${this.priority}}`,
       this.due_date ? `-> ${this.due_date.toISOString().split("T")[0]}` : "",
+      this.projects.map((project) => `#${project}`).join(" "),
       this.state === TODO_STATE.COMPLETED ? `✅ ${completion_date}` : "",
     ].join(" ");
 

@@ -18,7 +18,7 @@ Use `{PRIORITY}` to define a priority, currently `p1` till `p4` are supported, m
 
 - [ ] Add delegated work via @[[User]] syntax
 - [ ] Allow custom priority levels
-- [ ] Allow customed categories
+- [x] Allow customed projects
 - [ ] Allow opening tasks in context
 - [ ] Allow editing tasks
 - [ ] Allow showing tasks with full details

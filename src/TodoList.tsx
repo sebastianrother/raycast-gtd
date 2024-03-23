@@ -117,6 +117,10 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
                 });
               }
 
+              for (const project of task.projects) {
+                tags.push({ tag: { value: project, color: Color.Green } });
+              }
+
               return (
                 <List.Item
                   title={task.content}
@@ -126,6 +130,11 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
                   actions={
                     <ActionPanel>
                       <Action title="Complete Task" onAction={() => completeTask(task.id)} />
+                      <Action.PickDate
+                        title="Set Due Date"
+                        type="Date"
+                        onChange={(date) => changeDueDate(task.id, date)}
+                      />
                       {Object.keys(PRIORITY)
                         .filter((priority) => priority !== "NONE")
                         .map((priority, i) => {
@@ -139,11 +148,6 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
                             />
                           );
                         })}
-                      <Action.PickDate
-                        title="Set Due Date"
-                        type="Date"
-                        onChange={(date) => changeDueDate(task.id, date)}
-                      />
                     </ActionPanel>
                   }
                 />
