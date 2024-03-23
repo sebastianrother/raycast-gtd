@@ -16,7 +16,7 @@ Use `{PRIORITY}` to define a priority, currently `p1` till `p4` are supported, m
 
 ## TODOs
 
-- [ ] Add delegated work via @[[User]] syntax
+- [x] Add delegated work via @[[User]] syntax
 - [ ] Allow custom priority levels
 - [x] Allow customed projects
 - [ ] Allow opening tasks in context
@@ -25,3 +25,6 @@ Use `{PRIORITY}` to define a priority, currently `p1` till `p4` are supported, m
 - [ ] Allow sub-tasks
 - [ ] Support analytics
 - [ ] Better readme
+- [ ] Optimise performance / caching
+- [ ] Normalise markdown before displaying
+- [x] Add loading indicator

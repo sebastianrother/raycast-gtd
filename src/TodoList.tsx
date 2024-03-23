@@ -79,6 +79,7 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
 
   return (
     <List
+      isLoading={todos.length === 0}
       searchBarAccessory={
         <List.Dropdown
           tooltip="Filter by category"
@@ -86,7 +87,7 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
             setFilter(value as keyof typeof CATEGORY);
           }}
         >
-          <List.Dropdown.Item value="ALL" title="🪐 All" />;
+          <List.Dropdown.Item value="ALL" title="🪐 All" />
           {Object.entries(CATEGORY).map(([category, config]) => {
             return <List.Dropdown.Item key={category} value={category} title={`${config.icon} ${config.name}`} />;
           })}
@@ -119,6 +120,10 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
 
               for (const project of task.projects) {
                 tags.push({ tag: { value: project, color: Color.Green } });
+              }
+
+              for (const assginee of task.assignees) {
+                tags.push({ icon: Icon.Person, tag: { value: assginee }});
               }
 
               return (

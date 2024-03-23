@@ -18,7 +18,7 @@ type TTodoState = (typeof TODO_STATE)[keyof typeof TODO_STATE];
  * "CATEGORY EMOJI": Category of the task. Can be one of the following 💬 📚 💾 ✏️ 💡 🔭 👔 ❌
  * "-> YYYY-MM-DD": Due date of the task
  * "✅ YYYY-MM-DD": Completion date of the task
- * `@{LABEL}`: Label of the task
+ * `@[[LABEL]]`: Assignee of the task
  * `#{LABEL}`: Project of the task
  *
  */
@@ -32,6 +32,7 @@ export class Todo {
   category: keyof typeof CATEGORY;
   due_date?: Date;
   projects: string[] = [];
+  assignees: string[] = [];
   private state: TTodoState;
 
   constructor(path: string, line: number, content: string) {
@@ -54,10 +55,17 @@ export class Todo {
     }
 
     const projectRegex = /#(\S+)/g;
-    const projects = content.matchAll(projectRegex);
-    if (projects) {
-      this.projects = Array.from(projects).map((match) => match[1]);
+    const projects = Array.from(content.matchAll(projectRegex))
+    if (projects.length > 0) {
+      this.projects = projects.map((match) => match[1]);
     }
+
+    const assigneeRegex = /@\[\[([^\]]+)\]\]/g;
+    const assignees = Array.from(content.matchAll(assigneeRegex));
+    if (assignees.length > 0) {
+      this.assignees = assignees.map((match) => match[1]);
+    }
+
 
     const parsed_content = content
       .trim()
@@ -66,6 +74,7 @@ export class Todo {
       .replace(dueDateRegex, "")
       .replace(priorityRegex, "")
       .replaceAll(projectRegex, "")
+      .replaceAll(assigneeRegex, "")
       .trim();
 
     this.id = `${path}:${line}`;
@@ -134,6 +143,7 @@ export class Todo {
       this.priority === "NONE" ? "" : `{${this.priority}}`,
       this.due_date ? `-> ${this.due_date.toISOString().split("T")[0]}` : "",
       this.projects.map((project) => `#${project}`).join(" "),
+      this.assignees.map((assignee) => `@[[${assignee}]]`).join(" "),
       this.state === TODO_STATE.COMPLETED ? `✅ ${completion_date}` : "",
     ].join(" ");
 
