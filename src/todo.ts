@@ -31,13 +31,31 @@ export class Todo {
   priority: keyof typeof PRIORITY;
   category: keyof typeof CATEGORY;
   due_date?: Date;
+  completion_date?: Date;
   projects: string[] = [];
   assignees: string[] = [];
-  private state: TTodoState;
+  private _pending_completion: boolean = false;
 
   constructor(path: string, line: number, content: string) {
+    let parsedContent = content.trim();
+    parsedContent = parsedContent.replace("- [ ]", "");
+
+    const isMarkedComplete = content.includes("- [x]");
+    parsedContent = parsedContent.replace("- [x]", "");
+    const completionDateRegex = /✅ (\d{4}-\d{2}-\d{2})/;
+    const completionDateMatch = content.match(completionDateRegex);
+    if (completionDateMatch) {
+      const [, timeStamp] = completionDateMatch;
+      this.completion_date = new Date(timeStamp);
+    }
+    if (isMarkedComplete && !completionDateMatch) {
+      this.completion_date = new Date(2000, 0, 1);
+    }
+    parsedContent = parsedContent.replace(completionDateRegex, "");
+
     const priorityRegex = /\{(.*?)\}/;
     const priority = (content.match(priorityRegex)?.[1] || "NONE") as keyof typeof PRIORITY;
+    parsedContent = parsedContent.replace(priorityRegex, "");
 
     let category: TCategoryKey = "NONE";
     for (const categoryIcon of Object.keys(ICON_TO_CATEGORY)) {
@@ -46,6 +64,7 @@ export class Todo {
       }
       category = ICON_TO_CATEGORY[categoryIcon as TCategoryIcon];
     }
+    parsedContent = parsedContent.replace(CATEGORY[category].icon, "");
 
     const dueDateRegex = /-> (\d{4}-\d{2}-\d{2})/;
     const dueDateMatch = content.match(dueDateRegex);
@@ -53,38 +72,31 @@ export class Todo {
       const [, timeStamp] = dueDateMatch;
       this.due_date = new Date(timeStamp);
     }
+    parsedContent = parsedContent.replace(dueDateRegex, "");
 
     const projectRegex = /#(\S+)/g;
-    const projects = Array.from(content.matchAll(projectRegex))
+    const projects = Array.from(content.matchAll(projectRegex));
     if (projects.length > 0) {
       this.projects = projects.map((match) => match[1]);
     }
+    parsedContent = parsedContent.replaceAll(projectRegex, "");
 
     const assigneeRegex = /@\[\[([^\]]+)\]\]/g;
     const assignees = Array.from(content.matchAll(assigneeRegex));
     if (assignees.length > 0) {
       this.assignees = assignees.map((match) => match[1]);
     }
+    parsedContent = parsedContent.replaceAll(assigneeRegex, "");
 
-
-    const parsed_content = content
-      .trim()
-      .replace("- [ ]", "")
-      .replace(CATEGORY[category as TCategoryKey].icon, "")
-      .replace(dueDateRegex, "")
-      .replace(priorityRegex, "")
-      .replaceAll(projectRegex, "")
-      .replaceAll(assigneeRegex, "")
-      .trim();
+    parsedContent = parsedContent.trim();
 
     this.id = `${path}:${line}`;
     this.path = path;
     this.line = line;
     this.raw_content = content;
-    this.content = parsed_content;
+    this.content = parsedContent;
     this.priority = priority;
     this.category = category;
-    this.state = TODO_STATE.TODO;
   }
 
   get is_overdue() {
@@ -113,11 +125,11 @@ export class Todo {
   }
 
   complete() {
-    this.state = TODO_STATE.PENDING_COMPLETION;
+    this._pending_completion = true;
   }
 
   uncomplete() {
-    this.state = TODO_STATE.TODO;
+    this._pending_completion = false;
   }
 
   setPriority(newPriority: keyof typeof PRIORITY) {
@@ -128,14 +140,26 @@ export class Todo {
     this.due_date = newDueDate;
   }
 
+  get state(): TTodoState {
+    if (this.completion_date) {
+      return TODO_STATE.COMPLETED;
+    }
+
+    if (this._pending_completion) {
+      return TODO_STATE.PENDING_COMPLETION;
+    }
+
+    return TODO_STATE.TODO;
+  }
+
   commit() {
     // Commits the completion of the todo to the file
 
     if (this.state === TODO_STATE.PENDING_COMPLETION) {
-      this.state = TODO_STATE.COMPLETED;
+      this.completion_date = new Date();
     }
 
-    const completion_date = new Date().toISOString().split("T")[0];
+    const completion_date = this.completion_date?.toISOString().split("T")[0];
     const newContent = [
       this.state === TODO_STATE.COMPLETED ? "- [x]" : "- [ ]",
       CATEGORY[this.category].icon,
@@ -145,7 +169,7 @@ export class Todo {
       this.projects.map((project) => `#${project}`).join(" "),
       this.assignees.map((assignee) => `@[[${assignee}]]`).join(" "),
       this.state === TODO_STATE.COMPLETED ? `✅ ${completion_date}` : "",
-    ].join(" ");
+    ].filter(Boolean).join(" ");
 
     replaceLine(this.path, this.line, newContent);
   }
@@ -202,13 +226,14 @@ const ICON_TO_CATEGORY = (() => {
   return result;
 })();
 
-function getUncheckedTodosFOfFile(filePath: string) {
+function getTodosOfFile(filePath: string) {
   const lines = fs.readFileSync(filePath, "utf8").split("\n");
   const uncheckedTodos: Todo[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim().startsWith("- [ ]")) {
+    const line = lines[i].trim();
+    const isTodo = line.startsWith("- [ ]") || line.startsWith("- [x]");
+    if (!isTodo) {
       continue;
     }
 
@@ -218,16 +243,24 @@ function getUncheckedTodosFOfFile(filePath: string) {
   return uncheckedTodos;
 }
 
-export function getAllUncheckedTodos(directory: string) {
+function getAllTodos(directory: string, filter: (todo: Todo) => boolean = () => true) {
   const markdownFiles = getMarkdownFilesOfDirectory(directory);
-  let allUncheckedTasks: Todo[] = [];
+  let allTodos: Todo[] = [];
 
   for (const filePath of markdownFiles) {
-    const uncheckedTasksInFile = getUncheckedTodosFOfFile(filePath);
-    allUncheckedTasks = allUncheckedTasks.concat(uncheckedTasksInFile);
+    const todosInFile = getTodosOfFile(filePath).filter(filter);
+    allTodos = allTodos.concat(todosInFile);
   }
 
-  return allUncheckedTasks;
+  return allTodos;
+}
+
+export function getAllUncheckedTodos(directory: string) {
+  return getAllTodos(directory, (todo) => !todo.is_completed);
+}
+
+export function getAllCompletedTodos(directory: string) {
+  return getAllTodos(directory, (todo) => todo.is_completed);
 }
 
 function replaceLine(filePath: string, lineNumber: number, newContent: string) {

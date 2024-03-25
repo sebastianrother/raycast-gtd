@@ -27,6 +27,12 @@
       "title": "Today Todos",
       "description": "",
       "mode": "view"
+    },
+    {
+      "name": "summary",
+      "title": "Summary",
+      "description": "",
+      "mode": "view"
     }
   ],
   "dependencies": {

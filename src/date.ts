@@ -12,3 +12,7 @@ export function getRelativeDate(date: Date) {
   const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
   return formatter.format(Math.round(diff / 86400000), "day");
 }
+
+export function formatDate(date: Date) {
+    return date.toISOString().split("T")[0];
+}
