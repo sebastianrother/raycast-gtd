@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Color } from "@raycast/api";
-import { getCurrentDate } from "./date";
+import { formatDate, getCurrentDate } from "./date";
 
 const TODO_STATE = {
   TODO: "TODO",
@@ -15,9 +15,8 @@ type TTodoState = (typeof TODO_STATE)[keyof typeof TODO_STATE];
  * "- [ ]": Uncompleted task
  * "- [x]": Completed task
  * "{PRIORITY}": Priority of the task. Can be one of `p1` - `p4` or `NONE`
- * "CATEGORY EMOJI": Category of the task. Can be one of the following 💬 📚 💾 ✏️ 💡 🔭 👔 ❌
- * "-> YYYY-MM-DD": Due date of the task
- * "✅ YYYY-MM-DD": Completion date of the task
+ * "-> DD-MM-YYYY": Due date of the task
+ * "✅ DD-MM-YYYY": Completion date of the task
  * `@[[LABEL]]`: Assignee of the task
  * `#{LABEL}`: Project of the task
  *
@@ -29,48 +28,49 @@ export class Todo {
   content: string;
   raw_content: string;
   priority: keyof typeof PRIORITY;
-  category: keyof typeof CATEGORY;
   due_date?: Date;
   completion_date?: Date;
   projects: string[] = [];
   assignees: string[] = [];
+  modified_date: Date;
   private _pending_completion: boolean = false;
 
-  constructor(path: string, line: number, content: string) {
+  constructor({
+    path,
+    line,
+    content,
+    modified_date,
+  }: {
+    path: string;
+    line: number;
+    content: string;
+    modified_date: Date;
+  }) {
     let parsedContent = content.trim();
     parsedContent = parsedContent.replace("- [ ]", "");
 
     const isMarkedComplete = content.includes("- [x]");
     parsedContent = parsedContent.replace("- [x]", "");
-    const completionDateRegex = /✅ (\d{4}-\d{2}-\d{2})/;
+    const completionDateRegex = /✅ (\d{2}-\d{4}-\d{4})/;
     const completionDateMatch = content.match(completionDateRegex);
     if (completionDateMatch) {
       const [, timeStamp] = completionDateMatch;
-      this.completion_date = new Date(timeStamp);
+      this.completion_date = parseDate(timeStamp);
     }
     if (isMarkedComplete && !completionDateMatch) {
       this.completion_date = new Date(2000, 0, 1);
     }
     parsedContent = parsedContent.replace(completionDateRegex, "");
 
-    const priorityRegex = /\{(.*?)\}/;
-    const priority = (content.match(priorityRegex)?.[1] || "NONE") as keyof typeof PRIORITY;
+    const priorityRegex = /!!([1-4])/;
+    const priority = (content.match(priorityRegex)?.[0] || "NONE") as keyof typeof PRIORITY;
     parsedContent = parsedContent.replace(priorityRegex, "");
 
-    let category: TCategoryKey = "NONE";
-    for (const categoryIcon of Object.keys(ICON_TO_CATEGORY)) {
-      if (!content.includes(categoryIcon)) {
-        continue;
-      }
-      category = ICON_TO_CATEGORY[categoryIcon as TCategoryIcon];
-    }
-    parsedContent = parsedContent.replace(CATEGORY[category].icon, "");
-
-    const dueDateRegex = /-> (\d{4}-\d{2}-\d{2})/;
+    const dueDateRegex = /-> (\d{2}-\d{2}-\d{4})/;
     const dueDateMatch = content.match(dueDateRegex);
     if (dueDateMatch) {
       const [, timeStamp] = dueDateMatch;
-      this.due_date = new Date(timeStamp);
+      this.due_date = parseDate(timeStamp);
     }
     parsedContent = parsedContent.replace(dueDateRegex, "");
 
@@ -96,7 +96,7 @@ export class Todo {
     this.raw_content = content;
     this.content = parsedContent;
     this.priority = priority;
-    this.category = category;
+    this.modified_date = modified_date;
   }
 
   get is_overdue() {
@@ -111,8 +111,6 @@ export class Todo {
     if (!this.due_date) {
       return false;
     }
-
-    console.log(this.content, this.due_date, getCurrentDate(), this.due_date <= getCurrentDate());
 
     return this.due_date <= getCurrentDate();
   }
@@ -159,17 +157,18 @@ export class Todo {
       this.completion_date = new Date();
     }
 
-    const completion_date = this.completion_date?.toISOString().split("T")[0];
+    const completion_date = this.completion_date ? formatDate(this.completion_date) : "";
     const newContent = [
       this.state === TODO_STATE.COMPLETED ? "- [x]" : "- [ ]",
-      CATEGORY[this.category].icon,
       this.content,
       this.priority === "NONE" ? "" : `{${this.priority}}`,
-      this.due_date ? `-> ${this.due_date.toISOString().split("T")[0]}` : "",
+      this.due_date ? `-> ${formatDate(this.due_date)}` : "",
       this.projects.map((project) => `#${project}`).join(" "),
       this.assignees.map((assignee) => `@[[${assignee}]]`).join(" "),
       this.state === TODO_STATE.COMPLETED ? `✅ ${completion_date}` : "",
-    ].filter(Boolean).join(" ");
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     replaceLine(this.path, this.line, newContent);
   }
@@ -195,39 +194,17 @@ function getMarkdownFilesOfDirectory(directory: string) {
 }
 
 export const PRIORITY = {
-  p1: { color: Color.Red, name: "Urgent & Important" },
-  p2: { color: Color.Orange, name: "Urgent & Not Important " },
-  p3: { color: Color.Yellow, name: "Not Urgent & Important" },
-  p4: { color: Color.Green, name: "Not Urgent & Not Important" },
+  "!!1": { color: Color.Red, name: "Urgent & Important" },
+  "!!2": { color: Color.Orange, name: "Urgent & Not Important " },
+  "!!3": { color: Color.Yellow, name: "Not Urgent & Important" },
+  "!!4": { color: Color.Green, name: "Not Urgent & Not Important" },
   NONE: { color: Color.Blue, name: "No Priority" },
 } as const;
 
-export const CATEGORY = {
-  CHAT: { icon: "💬", name: "Talk to someone" },
-  READING: { icon: "📚 ", name: "Reading" },
-  CODING: { icon: "💾", name: "Coding" },
-  WRITING: { icon: "✏️", name: "Writing" },
-  THINKING: { icon: "💡", name: "Thinking" },
-  RESEARCH: { icon: "🔭", name: "Research" },
-  CHORE: { icon: "👔", name: "Chore" },
-  NONE: { icon: "❌", name: "No Category" },
-} as const;
-type TCategoryIcon = (typeof CATEGORY)[keyof typeof CATEGORY]["icon"];
-export type TCategoryKey = keyof typeof CATEGORY;
-
-const ICON_TO_CATEGORY = (() => {
-  const result = {} as Record<TCategoryIcon, keyof typeof CATEGORY>;
-  const keys = Object.keys(CATEGORY) as (keyof typeof CATEGORY)[];
-
-  for (const category of keys) {
-    result[CATEGORY[category].icon] = category as keyof typeof CATEGORY;
-  }
-
-  return result;
-})();
-
 function getTodosOfFile(filePath: string) {
   const lines = fs.readFileSync(filePath, "utf8").split("\n");
+  const stats = fs.statSync(filePath);
+  const mtime = stats.mtime;
   const uncheckedTodos: Todo[] = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -237,7 +214,7 @@ function getTodosOfFile(filePath: string) {
       continue;
     }
 
-    uncheckedTodos.push(new Todo(filePath, i + 1, line));
+    uncheckedTodos.push(new Todo({ path: filePath, line: i + 1, content: line, modified_date: mtime }));
   }
 
   return uncheckedTodos;
@@ -273,4 +250,9 @@ function replaceLine(filePath: string, lineNumber: number, newContent: string) {
   lines[lineNumber - 1] = newContent;
   fs.writeFileSync(filePath, lines.join("\n"));
   console.log(`Line ${lineNumber} replaced successfully in ${filePath}`);
+}
+
+function parseDate(dateString: string) {
+  const [day, month, year] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }

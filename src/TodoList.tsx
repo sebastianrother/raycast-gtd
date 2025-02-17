@@ -1,13 +1,10 @@
-import { useState } from "react";
-import { ActionPanel, List, Action, Icon, Color } from "@raycast/api";
+import { ActionPanel, List, Action, Icon, Color, useNavigation, Form } from "@raycast/api";
 import { showToast, Toast } from "@raycast/api";
 import { setTimeout } from "timers/promises";
-import { PRIORITY, CATEGORY, TCategoryKey, Todo } from "./todo";
+import { PRIORITY, Todo } from "./todo";
 import { getRelativeDate } from "./date";
 
 export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reloadTodos: () => void }) {
-  const [filter, setFilter] = useState<TCategoryKey | "ALL">("ALL");
-
   const notifyCompletion = async (completedTodo: Todo) => {
     const toast = await showToast({
       style: Toast.Style.Success,
@@ -59,54 +56,30 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
     reloadTodos();
   };
 
-  const filteredTasks = todos.filter((task) => {
-    return filter === "ALL" || task.category === filter;
-  });
-
   const tasksByPriority = ((tasks: Todo[]): Record<keyof typeof PRIORITY, Todo[]> => {
     const result: Record<string, Todo[]> = {};
-    result["NONE"] = [];
     for (const priority of Object.keys(PRIORITY)) {
       result[priority as keyof typeof PRIORITY] = [];
     }
+
+    result["NONE"] = [];
 
     for (const task of tasks) {
       result[task.priority].push(task);
     }
 
     return result;
-  })(filteredTasks);
+  })(todos);
 
   return (
-    <List
-      isLoading={todos.length === 0}
-      searchBarAccessory={
-        <List.Dropdown
-          tooltip="Filter by category"
-          onChange={(value) => {
-            setFilter(value as keyof typeof CATEGORY);
-          }}
-        >
-          <List.Dropdown.Item value="ALL" title="🪐 All" />
-          {Object.entries(CATEGORY).map(([category, config]) => {
-            return <List.Dropdown.Item key={category} value={category} title={`${config.icon} ${config.name}`} />;
-          })}
-        </List.Dropdown>
-      }
-    >
+    <List isLoading={todos.length === 0}>
       {Object.entries(tasksByPriority).map(([priority, tasks]) => {
         const currentPriority = PRIORITY[priority as keyof typeof tasksByPriority];
         return (
           <List.Section title={currentPriority.name} key={priority}>
             {tasks.map((task) => {
               type TTags = NonNullable<Parameters<typeof List.Item>[0]["accessories"]>;
-              const tags: TTags = [
-                { tag: { value: task.priority, color: PRIORITY[task.priority].color } },
-                {
-                  tag: { value: CATEGORY[task.category].icon, color: Color.Blue },
-                  tooltip: CATEGORY[task.category].name,
-                },
-              ];
+              const tags: TTags = [{ tag: { value: task.priority, color: PRIORITY[task.priority].color } }];
 
               if (task.due_date) {
                 tags.push({
@@ -123,13 +96,12 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
               }
 
               for (const assginee of task.assignees) {
-                tags.push({ icon: Icon.Person, tag: { value: assginee }});
+                tags.push({ icon: Icon.Person, tag: { value: assginee } });
               }
 
               return (
                 <List.Item
                   title={task.content}
-                  icon={task.is_pending_completion ? Icon.Check : Icon.Circle}
                   accessories={tags}
                   key={task.id}
                   actions={
@@ -140,12 +112,26 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
                         type="Date"
                         onChange={(date) => changeDueDate(task.id, date)}
                       />
+                      <Action.Push
+                        icon={Icon.Pencil}
+                        title="Edit Todo"
+                        shortcut={{ modifiers: ["cmd"], key: "n" }}
+                        target={
+                          <EditTodoForm
+                            todo={getTodoById(task.id)}
+                            onEdit={(todo: Todo) => {
+                              todo.commit();
+                              reloadTodos();
+                            }}
+                          />
+                        }
+                      />
                       {Object.keys(PRIORITY)
                         .filter((priority) => priority !== "NONE")
                         .map((priority, i) => {
                           return (
                             <Action
-                              title={`Change Priority to: "${currentPriority.name}"`}
+                              title={`Change Priority to: "${PRIORITY[priority as keyof typeof PRIORITY].name}"`}
                               onAction={() => changePriority(task.id, priority as keyof typeof PRIORITY)}
                               // @ts-expect-error No idea how to cast this
                               shortcut={{ modifiers: ["cmd"], key: (i + 1).toString() }}
@@ -162,5 +148,29 @@ export default function TodoList({ todos, reloadTodos }: { todos: Todo[]; reload
         );
       })}
     </List>
+  );
+}
+
+function EditTodoForm({ todo, onEdit }: { todo: Todo; onEdit: (todo: Todo) => void }) {
+  const { pop } = useNavigation();
+
+  function handleSubmit() {
+    onEdit(todo);
+    pop();
+  }
+
+  return (
+    <Form
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Save Todo" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.TextField id="content" title="Content" value={todo.content} />
+      <Form.DatePicker id="dueDate" title="dueDate" value={todo.due_date} />
+      <Form.Dropdown id="priority" title="priority" value={todo.priority} />
+      <Form.Dropdown id="category" title="category" value={todo.category} />
+    </Form>
   );
 }
