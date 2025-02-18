@@ -14,7 +14,6 @@ export function getRelativeDate(date: Date) {
 }
 
 export function formatDate(date: Date) {
-  console.log(date);
   return date
     .toLocaleDateString("en-GB", {
       day: "2-digit",

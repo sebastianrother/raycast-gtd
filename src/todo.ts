@@ -51,7 +51,7 @@ export class Todo {
 
     const isMarkedComplete = content.includes("- [x]");
     parsedContent = parsedContent.replace("- [x]", "");
-    const completionDateRegex = /✅ (\d{2}-\d{4}-\d{4})/;
+    const completionDateRegex = /✅ (\d{2}-\d{2}-\d{4})/;
     const completionDateMatch = content.match(completionDateRegex);
     if (completionDateMatch) {
       const [, timeStamp] = completionDateMatch;
@@ -161,7 +161,7 @@ export class Todo {
     const newContent = [
       this.state === TODO_STATE.COMPLETED ? "- [x]" : "- [ ]",
       this.content,
-      this.priority === "NONE" ? "" : `{${this.priority}}`,
+      this.priority === "NONE" ? "" : this.priority,
       this.due_date ? `-> ${formatDate(this.due_date)}` : "",
       this.projects.map((project) => `#${project}`).join(" "),
       this.assignees.map((assignee) => `@[[${assignee}]]`).join(" "),

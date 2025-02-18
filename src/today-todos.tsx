@@ -17,7 +17,6 @@ export default function TodayTodos() {
   }, []);
 
   const todayTodos = todos.filter((todo) => todo.is_due);
-  console.log(todayTodos);
 
   return <TodoList todos={todayTodos} reloadTodos={reloadTodos} />;
 }

@@ -16,8 +16,8 @@ export default function Summary() {
   }, []);
 
   const groupedTodos = groupByCompletionDate(todos);
+  console.log(groupedTodos);
   const completionDates = Object.keys(groupedTodos).sort((a, b) => b.localeCompare(a));
-  console.log(completionDates);
 
   return (
     <List isLoading={todos.length === 0} searchBarPlaceholder="Filter todos by name...">
